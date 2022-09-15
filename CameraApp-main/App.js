@@ -5,12 +5,19 @@ import { Camera } from 'expo-camera';
 import { shareAsync } from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 
+let apiKey = 'YOUR_API_KEY';
+
+import * as Location from 'expo-location';
+
 export default function App() {
   let cameraRef = useRef();
   const [hasCameraPermission, setHasCameraPermission] = useState();
   const [hasMediaLibraryPermission, setHasMediaLibraryPermission] = useState();
   const [photo, setPhoto] = useState();
-
+  const [location, setLocation] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [address, setAddress] = useState(null);
+  
   useEffect(() => {
     (async () => {
       const cameraPermission = await Camera.requestCameraPermissionsAsync();
@@ -31,10 +38,38 @@ export default function App() {
       quality: 1,
       base64: true,
       exif: false
-    };
-
+    }
     let newPhoto = await cameraRef.current.takePictureAsync(options);
     setPhoto(newPhoto);
+
+    let { status } = await Location.requestPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+      }
+
+      Location.setGoogleApiKey(apiKey);
+
+      console.log(status);
+
+      let { coords } = await Location.getCurrentPositionAsync();
+
+      setLocation(coords);
+
+      console.log(coords);
+
+      if (coords) {
+        let { longitude, latitude } = coords;
+
+        let regionName = await Location.reverseGeocodeAsync({
+          longitude,
+          latitude,
+        });
+        setAddress(regionName[0]);
+        console.log(regionName, 'nothing');
+      }
+;
+
+   
   };
 
   if (photo) {
@@ -53,6 +88,11 @@ export default function App() {
     return (
       <SafeAreaView style={styles.container}>
         <Image style={styles.preview} source={{ uri: "data:image/jpg;base64," + photo.base64 }} />
+        <Text style={styles.big}>
+        {!location
+          ? 'Waiting'
+          : `${JSON.stringify(address?.['subregion'])} ${JSON.stringify(address?.['district'])}`}
+      </Text>
         <Button title="Share" onPress={sharePic} />
         {hasMediaLibraryPermission ? <Button title="Save" onPress={savePhoto} /> : undefined}
         <Button title="Discard" onPress={() => setPhoto(undefined)} />
@@ -83,5 +123,5 @@ const styles = StyleSheet.create({
   preview: {
     alignSelf: 'stretch',
     flex: 1
-  }
+  },
 });
